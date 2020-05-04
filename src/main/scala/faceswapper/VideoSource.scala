@@ -1,6 +1,7 @@
 package faceswapper
 
 import org.bytedeco.javacv.{FFmpegFrameGrabber, Frame, OpenCVFrameConverter, OpenCVFrameGrabber}
+import org.bytedeco.opencv.global.opencv_imgcodecs._
 import org.bytedeco.opencv.opencv_core.{Mat, Size}
 
 abstract class VideoSource {
@@ -60,4 +61,17 @@ class CameraSource(deviceIndex: Int) extends VideoSource {
 
   def grabFrame(): Frame =
     grabber.grabFrame()
+}
+
+class ImageFileSource(filename: String) extends VideoSource {
+  private val image = imread(filename)
+  if (image.empty()) {
+    println(s"Couldn't open image source file $filename")
+    sys.exit(-1)
+  }
+
+  def size(): Size = image.size()
+
+  def grabFrame(): Frame =
+    converter.convert(image)
 }

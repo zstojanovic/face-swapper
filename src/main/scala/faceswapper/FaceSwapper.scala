@@ -18,7 +18,9 @@ class FaceSwapper() {
       sys.exit(-1)
   }
 
-  private var smallFrame: Mat = new Mat
+  private var smallFrame: Mat = _
+  private var smallFrameAnn: Mat = _
+  private var smallFrameBob: Mat = _
   private var rectAnn: Rect = _
   private var rectBob: Rect = _
   private var bigRectAnn = new Rect
@@ -55,6 +57,18 @@ class FaceSwapper() {
 
   def swapFaces(frame: Mat, rectAnn: Rect, rectBob: Rect) {
     calcSmallFrame(frame, rectAnn, rectBob)
+    swapFaces()
+  }
+
+  def swapFaces(frameAnn: Mat, rectAnn: Rect, frameBob: Mat, rectBob: Rect) {
+    calcSmallFrame(frameAnn, rectAnn, frameBob, rectBob)
+
+    swapFaces()
+    smallFrame(this.rectAnn).copyTo(smallFrameAnn)
+    smallFrame(this.rectBob).copyTo(smallFrameBob)
+  }
+
+  private def swapFaces(): Unit = {
     findFacePoints()
     calcTransformationMatrices()
 
@@ -96,13 +110,49 @@ class FaceSwapper() {
     smallFrame = frame(bounding_rect)
   }
 
+  private def calcSmallFrame(frameAnn: Mat, rAnn: Rect, frameBob: Mat, rBob: Rect): Unit = {
+    var boundingRectAnn = new Rect(rAnn)
+    boundingRectAnn = rectMinusPoint(boundingRectAnn, new Point(50, 50))
+    boundingRectAnn = rectPlusSize(boundingRectAnn, new Size(100, 100))
+    boundingRectAnn = rectIntersect(boundingRectAnn, new Rect(0, 0, frameAnn.cols, frameAnn.rows))
+
+    var boundingRectBob = new Rect(rBob)
+    boundingRectBob = rectMinusPoint(boundingRectBob, new Point(50, 50))
+    boundingRectBob = rectPlusSize(boundingRectBob, new Size(100, 100))
+    boundingRectBob = rectIntersect(boundingRectBob, new Rect(0, 0, frameBob.cols, frameBob.rows))
+
+    smallFrameAnn = frameAnn(boundingRectAnn)
+    smallFrameBob = frameBob(boundingRectBob)
+
+    smallFrame = new Mat(
+      boundingRectAnn.height.max(boundingRectBob.height), boundingRectAnn.width + boundingRectBob.width,
+      frameAnn.`type`, AbstractScalar.BLACK)
+
+    this.rectAnn = new Rect(new Point(0, 0), boundingRectAnn.size()) //rectMinusPoint(rAnn, bounding_rect.tl())
+    this.rectBob = new Rect(new Point(boundingRectAnn.width(), 0), boundingRectBob.size()) //rectMinusPoint(rBob, bounding_rect.tl())
+
+    frameAnn(boundingRectAnn)
+      .copyTo(smallFrame(this.rectAnn))
+    frameBob(boundingRectBob)
+      .copyTo(smallFrame(this.rectBob))
+
+    bigRectAnn =
+      rectIntersect(
+        rectPlusSize(
+          rectMinusPoint(this.rectAnn, new Point(rAnn.width / 4, rAnn.height / 4)),
+          new Size(rAnn.width / 2, rAnn.height / 2)),
+        new Rect(0, 0, smallFrame.cols, smallFrame.rows))
+    bigRectBob =
+      rectIntersect(
+        rectPlusSize(
+          rectMinusPoint(this.rectBob, new Point(rBob.width / 4, rBob.height / 4)),
+          new Size(rBob.width / 2, rBob.height / 2)),
+        new Rect(0, 0, smallFrame.cols, smallFrame.rows))
+  }
+
   private def findFacePoints(): Unit = {
     val shapes = new Point2fVectorVector
     faceLandmarkDetector.fit(smallFrame, new RectVector(rectAnn, rectBob), shapes)
-
-    def set1(point: Point, i: Int, a: Int, b: Int) = {
-      set2(point, i, shapes.get(a).get(b))
-    }
 
     def set2(point: Point, i: Int, p2: Point2f) = {
       point.position(i).x(p2.x.toInt)
@@ -119,24 +169,24 @@ class FaceSwapper() {
       point.position(i).y(p2.y.toInt)
     }
 
-    set1(pointsAnn, 0, 0, 0)
-    set1(pointsAnn, 1, 0, 3)
-    set1(pointsAnn, 2, 0, 5)
-    set1(pointsAnn, 3, 0, 8)
-    set1(pointsAnn, 4, 0, 11)
-    set1(pointsAnn, 5, 0, 13)
-    set1(pointsAnn, 6, 0, 16)
+    set2(pointsAnn, 0, shapes.get(0).get(0))
+    set2(pointsAnn, 1, shapes.get(0).get(3))
+    set2(pointsAnn, 2, shapes.get(0).get(5))
+    set2(pointsAnn, 3, shapes.get(0).get(8))
+    set2(pointsAnn, 4, shapes.get(0).get(11))
+    set2(pointsAnn, 5, shapes.get(0).get(13))
+    set2(pointsAnn, 6, shapes.get(0).get(16))
     val nose_length_ann = pointMinus(shapes.get(0).get(27), shapes.get(0).get(30))
     set2(pointsAnn, 7, pointPlus(shapes.get(0).get(26), nose_length_ann))
     set2(pointsAnn, 8, pointPlus(shapes.get(0).get(17), nose_length_ann))
 
-    set1(pointsBob, 0, 1, 0)
-    set1(pointsBob, 1, 1, 3)
-    set1(pointsBob, 2, 1, 5)
-    set1(pointsBob, 3, 1, 8)
-    set1(pointsBob, 4, 1, 11)
-    set1(pointsBob, 5, 1, 13)
-    set1(pointsBob, 6, 1, 16)
+    set2(pointsBob, 0, shapes.get(1).get(0))
+    set2(pointsBob, 1, shapes.get(1).get(3))
+    set2(pointsBob, 2, shapes.get(1).get(5))
+    set2(pointsBob, 3, shapes.get(1).get(8))
+    set2(pointsBob, 4, shapes.get(1).get(11))
+    set2(pointsBob, 5, shapes.get(1).get(13))
+    set2(pointsBob, 6, shapes.get(1).get(16))
     val nose_length_bob = pointMinus(shapes.get(1).get(27), shapes.get(1).get(30))
     set2(pointsBob, 7, pointPlus(shapes.get(1).get(26), nose_length_bob))
     set2(pointsBob, 8, pointPlus(shapes.get(1).get(17), nose_length_bob))
